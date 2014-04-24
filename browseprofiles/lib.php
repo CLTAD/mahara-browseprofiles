@@ -89,7 +89,18 @@ class ArtefactTypeBrowseProfiles extends ArtefactType {
         $onetimeclause = false;
         $count = 0;
 
-        $selectclause =     'SELECT va.view, a.id, v.mtime, v.owner';
+        if (is_postgres()) {
+            $selectclause =  'SELECT *
+                              FROM (
+                                    SELECT DISTINCT ON (va.view) va.view, a.id, v.mtime, v.owner';
+            $grouporderclause = ') p
+                                  ORDER BY mtime DESC';
+        }
+        else if (is_mysql()) {
+            $selectclause =  'SELECT va.view, a.id, v.mtime, v.owner';
+            $grouporderclause = 'GROUP BY va.view
+                                 ORDER BY a.mtime DESC';
+        }
         $fromclause =       ' FROM {view_access} va';
         $joinclause =       " INNER JOIN {view} v ON (va.view = v.id AND v.type = 'profile')";
         $join2clause =      " JOIN {view_artefact} var ON v.id = var.view";
@@ -216,7 +227,6 @@ class ArtefactTypeBrowseProfiles extends ArtefactType {
 
         /**
         * The query checks for profile page images.
-        * The GROUP BY condition limits the output to 1 image per page
         */
         $profileimagesids = get_records_sql_array("
                 $selectclause
@@ -227,8 +237,7 @@ class ArtefactTypeBrowseProfiles extends ArtefactType {
                 $join4clause
                 $whereclause
                 $andclause
-                GROUP BY va.view
-                ORDER BY a.mtime DESC
+                $grouporderclause
                 ", array(), $offset, $limit);
 
         if ($profileimagesids) {
